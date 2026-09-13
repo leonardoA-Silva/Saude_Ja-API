@@ -1,0 +1,13 @@
+# secrets
+.env
+.env*.local
+
+# supabase cli
+supabase/.branches
+supabase/.temp
+
+# deps (edge function tooling)
+node_modules/
+
+# os
+.DS_Store
