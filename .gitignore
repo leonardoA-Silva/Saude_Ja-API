@@ -2,12 +2,18 @@
 .env
 .env*.local
 
-# supabase cli
-supabase/.branches
-supabase/.temp
+# build
+dist/
 
-# deps (edge function tooling)
+# deps
 node_modules/
+
+# prisma
+*.db
+*.db-journal
+
+# logs
+*.log
 
 # os
 .DS_Store

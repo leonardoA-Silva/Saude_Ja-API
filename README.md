@@ -1,36 +1,46 @@
-# SaudeJa API (Supabase backend)
+# SaudeJa API (Express backend)
 
 Backend for the SaudeJa appointment app — MVP is patient-only, doctors are seeded catalog data.
 
 ## Stack
-- Supabase Postgres + Auth + Storage + Edge Functions (Deno)
-- SQL migrations in `supabase/migrations/`, seed in `supabase/seed.sql`
+- Node + Express 4 + TypeScript
+- Prisma + PostgreSQL
+- JWT auth (bcrypt + jsonwebtoken), zod validation
 
 ## Structure
 ```
 api/
-  supabase/
-    migrations/0001_init.sql   -> tables, indexes, RLS
-    seed.sql                   -> specialties, clinics, doctors, availability (fictional)
-    functions/
-      create-appointment/      -> slot validation + booking (S3)
-      send-reminders/          -> 24h / 2h push reminders (S4)
+  prisma/
+    schema.prisma   -> Profile, Specialty, Clinic, Doctor, Availability, Appointment
+    seed.ts         -> fictional catalog (npx tsx prisma/seed.ts)
+  src/
+    server.ts       -> listen entry
+    app.ts          -> middlewares + route mounting
+    routes/         -> health (live), auth/specialties/doctors/appointments (S1-S4)
+    middlewares/    -> requireAuth (JWT), notFound, errorHandler
+    lib/            -> prisma, jwt, password
+    utils/          -> AppError
 ```
 
 ## Setup
-1. Create a project at https://supabase.com/dashboard
-2. SQL Editor > run `supabase/migrations/0001_init.sql`, then `supabase/seed.sql`
-3. Auth > enable Email provider
-4. Copy `.env.example` to `.env` (never commit `.env`) and fill the keys
-5. Paste `EXPO_PUBLIC_SUPABASE_URL` + anon key into `mobile/.env`
+1. `npm install`
+2. Copy `.env.example` to `.env` and set `DATABASE_URL` + `JWT_SECRET`
+3. `npx prisma migrate dev --name init` then `npx tsx prisma/seed.ts`
+4. `npm run dev` -> `GET http://localhost:3000/health`
+
+## Contract (mobile)
+- `POST /auth/register` `{ nome, cpf, email, telefone, senha }` -> `{ token, user }`
+- `POST /auth/login` `{ cpfOuEmail, senha }` -> `{ token, user }`
+- `GET /specialties`, `GET /doctors?specialtyId=`, `GET /doctors/:id`
+- `GET /appointments` (auth), `POST /appointments` (auth), `PATCH /appointments/:id/cancel|reschedule` (auth)
 
 ## Rules
-- Catalog tables (`specialties`, `clinics`, `doctors`, `doctor_clinics`, `doctor_availability`): public read-only.
-- `profiles` / `appointments` / `notifications`: RLS scoped to `auth.uid()`.
-- `service_role` key is server-only — only Edge Functions use it.
-- `unique (doctor_id, data_hora)` is the double-booking guard.
+- `@@unique([doctorId, startsAt])` is the double-booking guard.
+- All `/appointments` routes require `Authorization: Bearer <token>`.
+- Times stored as UTC, displayed as America/Sao_Paulo in mobile.
 
 ## Roadmap
-- S1: project + migration applied, Auth wired in mobile
-- S3: `create-appointment` implemented + deployed
-- S4: `send-reminders` + pg_cron schedule
+- S1: auth endpoints + JWT in mobile
+- S2: catalog endpoints
+- S3: booking with slot validation
+- S4: cancel/reschedule + reminders

@@ -1,0 +1,102 @@
+// SaudeJa domain model. Mirrors the MVP plan: public catalog
+// (specialties, clinics, doctors, availability) + patient-owned
+// appointments. The unique (doctorId, startsAt) guard prevents
+// double-booking at the DB level.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppointmentStatus {
+  pendente
+  confirmada
+  cancelada
+  realizada
+  faltou
+}
+
+model Profile {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  passwordHash  String
+  nome          String
+  cpf           String        @unique
+  telefone      String?
+  avatarUrl     String?
+  convenio      String?
+  expoPushToken String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  appointments  Appointment[]
+
+  @@map("profiles")
+}
+
+model Specialty {
+  id      String   @id @default(uuid())
+  nome    String   @unique
+  icone   String?
+  doctors Doctor[]
+
+  @@map("specialties")
+}
+
+model Clinic {
+  id       String   @id @default(uuid())
+  nome     String
+  endereco String
+  doctors  Doctor[]
+
+  @@map("clinics")
+}
+
+model Doctor {
+  id           String         @id @default(uuid())
+  nome         String
+  crm          String?
+  fotoUrl      String?
+  rating       Float          @default(5.0)
+  ativo        Boolean        @default(true)
+  specialtyId  String?
+  specialty    Specialty?     @relation(fields: [specialtyId], references: [id])
+  clinics      Clinic[]
+  availability Availability[]
+  appointments Appointment[]
+
+  @@map("doctors")
+}
+
+model Availability {
+  id           String @id @default(uuid())
+  doctorId     String
+  doctor       Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  diaSemana    Int // 0 = Sunday, 1-5 = Mon-Fri
+  horaInicio   String // "08:00"
+  horaFim      String // "12:00"
+  intervaloMin Int    @default(30)
+
+  @@map("availability")
+}
+
+model Appointment {
+  id         String            @id @default(uuid())
+  patientId  String
+  patient    Profile           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId   String
+  doctor     Doctor            @relation(fields: [doctorId], references: [id])
+  clinicId   String
+  startsAt   DateTime
+  duracaoMin Int               @default(30)
+  status     AppointmentStatus @default(pendente)
+  motivo     String?
+  createdAt  DateTime          @default(now())
+
+  @@unique([doctorId, startsAt])
+  @@index([patientId, startsAt])
+  @@map("appointments")
+}
